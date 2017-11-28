@@ -33,7 +33,15 @@ struct Camera {
   static const Camera::Real kNearInfinity;
 
   // member variables
-  enum struct Type { FTHETA, RECTILINEAR } type;
+  enum struct Type{ FTHETA, RECTILINEAR} type;
+  enum class DistortionModel
+  {
+    Simple=0,
+    OpenCV=1, //OpenCV pinhole
+    OpenCV_FE=2, //OpenCV FishEye
+    OmniDir=3,
+    Count=4
+  } distortionModel;
 
   Vector3 position;
   Matrix3 rotation;
@@ -41,7 +49,7 @@ struct Camera {
   Vector2 resolution;
 
   Vector2 principal;
-  Vector2 distortion;
+  std::vector<Real> distortion;
   Vector2 focal;
   Real fovThreshold; // cos(fov) * abs(cos(fov))
 
@@ -49,7 +57,7 @@ struct Camera {
   std::string group;
 
   // construction and de/serialization
-  Camera(const Type type, const Vector2& resolution, const Vector2& focal);
+  Camera(const Type type, DistortionModel model, const Vector2& resolution, const Vector2& focal);
   Camera(const json::Value &json);
   json::Value serialize() const;
 
@@ -81,7 +89,7 @@ struct Camera {
   void setDefaultFov();
   bool isDefaultFov() const;
 
-  // compute pixel coordinates
+    // compute pixel coordinates
   Vector2 pixel(const Vector3& rig) const {
     // transform from rig to camera space
     Vector3 camera = rotation * (rig - position);
@@ -149,6 +157,26 @@ struct Camera {
     return inside / Real(kProbeCount * kProbeCount);
   }
 
+  static size_t distortionModelCount(DistortionModel model)
+  {
+      switch(model)
+      {
+      case DistortionModel::Simple:
+          return 2;
+          break;
+      case DistortionModel::OpenCV:
+          return 6;
+          break;
+      case DistortionModel::OpenCV_FE:
+          return 4;
+          break;
+      case DistortionModel::OmniDir:
+          return 3;
+          break;
+      }
+      return 0;
+  }
+
   // sample the camera's fov cone to find the closest point to the image center
   static float approximateUsablePixelsRadius(const Camera& camera) {
     const Camera::Real fov = camera.getFov();
@@ -169,17 +197,76 @@ struct Camera {
   Vector3 backward() const { return rotation.row(2); }
 
   // distortion is modeled in pixel space as:
-  //   distort(r) = r + d0 * r^3 + d1 * r^5
+  //   DistortionModel::Simple -distort(r) = r + d0 * r^3 + d1 * r^5
+  //   DistortionModel::OpenCV -distort(r) = r + d0 * r^3 + d1 * r^5
+  //   DistortionModel::OpenCV_FE -distort(r) = r + d0 * r^3 + d1 * r^5
+  //   DistortionModel::OmniDir -distort(r) = r + d0 * r^3 + d1 * r^5
   Real distort(Real r) const {
-    return distortFactor(r * r) * r;
+    return distortFactor(r);
   }
 
-  Real distortFactor(Real rSquared) const {
-    return 1 + rSquared * (distortion[0] + rSquared * distortion[1]);
+  Real distortFactor(Real r) const
+  {
+    Real r2=r*r;
+
+    switch(distortionModel)
+    {
+    case DistortionModel::Simple:
+      {
+        Real r4=r2 * r2;
+
+        return 1 + r * (r2*distortion[0] + r4*distortion[1]);
+      }
+      break;
+    case DistortionModel::OpenCV:
+      {
+        Real r4 = r2 * r2;
+        Real r6 = r4 * r2;
+        Real num = 1 + r2 * distortion[0] + r4 * distortion[1] + r6 * distortion[2];
+        Real den = 1 + r2 * distortion[3] + r4 * distortion[4] + r6 * distortion[5];
+
+        return num/den;
+      }
+      break;
+    case DistortionModel::OpenCV_FE:
+      {
+        Real r4 = r2 * r2;
+        Real r6 = r4 * r2;
+        Real r8 = r4 * r4;
+        return 1 + r2 * distortion[0] + r4 * distortion[1] + r6 * distortion[2] + r8 * distortion[3];
+      }
+      break;
+    case DistortionModel::OmniDir:
+      {
+        Real r4 = r2 * r2;
+        Real r6 = r4 * r2;
+
+        Real cdist = 1 + distortion[1]*r2 + distortion[2]*r4;
+
+        return cdist;
+      }
+      break;
+    }
+    return 0.0f;
+  }
+
+  static bool isDistortionZero(const std::vector<Real> distortion)
+  {
+    Real distortionSum=0.0;
+
+    for(size_t i=0; i<distortion.size(); ++i)
+        distortionSum+=distortion[i];
+    return (distortionSum==0.0);
+  }
+
+  static void setsDistortionZero(std::vector<Real> &distortion)
+  {
+      for(size_t i=0; i<distortion.size(); ++i)
+          distortion[i]=0.0;
   }
 
   Real undistort(Real d) const {
-    if (distortion.isZero()) {
+    if (isDistortionZero(distortion)) {
       return d; // short circuit common case
     }
     // solve d = distort(r) for r using newton's method
@@ -201,9 +288,20 @@ struct Camera {
 
   Vector2 cameraToSensor(const Vector3& camera) const {
     if (type == Type::FTHETA) {
-      Real norm = camera.head<2>().norm();
-      Real r = atan2(norm, -camera.z());
-      return distort(r) / norm * camera.head<2>();
+        if(distortionModel == DistortionModel::OmniDir){
+            Vector3 point=camera.normalized();
+            Vector2 xu=Vector2(point.x()/(point.z()+distortion[0]), point.y()/(point.z()+distortion[0]));
+            Real r=xu.norm();
+            Real d=distort(r);
+            
+            return xu*d;
+        }
+        else
+        {
+            Real norm=camera.head<2>().norm();
+            Real r=atan2(norm, -camera.z());
+            return distort(r)/norm * camera.head<2>();
+        }
     } else {
       CHECK(type == Type::RECTILINEAR) << "unexpected: " << int(type);
       // project onto z = -1 plane
@@ -242,6 +340,24 @@ struct Camera {
     return sensorToCamera(sensor);
   }
 
+  static json::Value serializeDistortion(const std::vector<Real> &distortion)
+  {
+      json::Array values;
+
+      for(size_t i=0; i<distortion.size(); ++i)
+          values.push_back(distortion[i]);
+      return values;
+  }
+
+  static void deserializeDistortion(const json::Array &json, std::vector<Real> &distortion)
+  {
+      distortion.resize(json.size());
+
+      for(size_t i=0; i < json.size(); ++i)
+          distortion[i]=json[i].ToDouble();
+  }
+
+
   template<typename V>
   static json::Value serializeVector(const V& v) {
       json::Array values;
@@ -276,6 +392,28 @@ struct Camera {
         return Type(i);
       }
     }
+  }
+
+  static std::string serializeDistortionModel(const DistortionModel& model)
+  {
+      if(model==DistortionModel::OpenCV)
+          return "OpenCV";
+      else if(model==DistortionModel::OpenCV_FE)
+          return "OpenCV_FE";
+      else if(model==DistortionModel::OmniDir)
+          return "OmniDir";
+      else
+          return "Simple";
+  }
+
+  static DistortionModel deserializeDistortionModel(const json::Value &json)
+  {
+      for(size_t i=0; i<(size_t)DistortionModel::Count; ++i)
+      {
+          if(serializeDistortionModel(DistortionModel(i))==json.ToString())
+              return DistortionModel(i);
+      }
+      return DistortionModel::Simple;
   }
 };
 

@@ -123,26 +123,6 @@ void perturbCameras(
   }
 }
 
-struct Keypoint {
-  Camera::Vector2 position;
-  Camera::Real scale;
-  Camera::Real orientation;
-  int index;
-
-  Keypoint(
-      const Camera::Vector2& position,
-      Camera::Real scale = 0,
-      Camera::Real orientation = 0,
-      int index = -1):
-    position(position),
-    scale(scale),
-    orientation(orientation),
-    index(index) {
-  }
-};
-
-using KeypointMap = std::unordered_map<std::string, std::vector<Keypoint>>;
-
 KeypointMap loadKeypointMap(const json::Value &parsed) {
   std::unordered_map<std::string, std::vector<Keypoint>> result;
 
@@ -265,29 +245,6 @@ void generateArtificalPoints(
 Camera::Vector3 triangulate(const Observations& observations) {
   return triangulateNonlinear(observations, FLAGS_force_in_front);
 }
-
-// a trace is a world coordinate and a list of observations that reference it
-struct Trace {
-  Camera::Vector3 position;
-
-  std::vector<std::pair<std::string, int>> references;
-
-  void add(const std::string& image, const int index) {
-    references.emplace_back(image, index);
-  }
-
-  // inherit trace's references
-  void inherit(Trace& trace, KeypointMap& keypointMap, int index) {
-    for (const auto& ref : trace.references) {
-     keypointMap[ref.first][ref.second].index = index;
-    }
-    references.insert(
-      references.end(),
-      trace.references.begin(),
-      trace.references.end());
-    trace.references.clear();
-  }
-};
 
 // return reprojection RMSE for each match in overlap
 // returns NaN if one observation is outside the other camera's fov
@@ -605,6 +562,19 @@ double acosClamp(double x) {
   return std::acos(std::min(std::max(-1.0, x), 1.0));
 }
 
+Camera::Real squaredNormDistortion(const std::vector<Camera::Real> &distortion1, const std::vector<Camera::Real> &distortion2)
+{
+    Camera::Real distortionSum=0.0;
+    size_t distortionCount=std::min(distortion1.size(), distortion2.size());
+
+    for(size_t i=0; i<distortionCount; ++i)
+    {
+        Camera::Real value=distortion1[i]-distortion2[i];
+        distortionSum+=(value*value);
+    }
+    return distortionSum;
+}
+
 std::string getCameraRmseReport(
     const std::vector<Camera>& cameras,
     const std::vector<Camera>& groundTruth) {
@@ -633,7 +603,7 @@ std::string getCameraRmseReport(
     {
       auto before = groundTruth[i].distortion;
       auto after = cameras[i].distortion;
-      distortion += (after - before).squaredNorm();
+      distortion += squaredNormDistortion(after, before);
     }
     {
       auto before = groundTruth[i].focal;
@@ -821,7 +791,15 @@ void refine(
   std::vector<Camera::Vector3> rotations;
   std::vector<Camera::Vector2> principals;
   std::vector<Camera::Real> focals;
-  std::vector<Camera::Vector2> distortions;
+  std::vector<std::vector<double> > distortions;
+  
+  Camera::DistortionModel distortionModel=Camera::DistortionModel::Simple;
+  size_t distortionCount=0;
+
+  if(!cameras.empty())
+      distortionModel=cameras[0].distortionModel;
+  distortionCount=Camera::distortionModelCount(distortionModel);
+
   for (auto& camera : cameras) {
     positions.push_back(camera.position);
     rotations.push_back(camera.getRotation());
@@ -832,24 +810,18 @@ void refine(
 
   // create the problem: add a residual for each observation
   ceres::Problem problem;
-  for (const Trace& trace : traces) {
-    for (const auto& ref : trace.references) {
-      const std::string& image = ref.first;
-      const auto& keypoint = keypointMap[image][ref.second];
-      const int camera = getCameraIndex(image);
-      const int group = cameraGroupToIndex[cameras[camera].group];
-      ReprojectionFunctor::addResidual(
-        problem,
-        positions[camera],
-        rotations[camera],
-        principals[camera],
-        focals[camera],
-        distortions[FLAGS_shared_distortion ? group : camera],
-        traces[keypoint.index].position,
-        cameras[camera],
-        keypoint.position,
-        FLAGS_robust);
-    }
+
+  switch(distortionCount)
+  {
+  case 2:
+      reprojectTraces<2>(problem, cameras, positions, rotations, principals, focals, distortions, keypointMap, traces);
+      break;
+  case 4:
+      reprojectTraces<4>(problem, cameras, positions, rotations, principals, focals, distortions, keypointMap, traces);
+      break;
+  case 6:
+      reprojectTraces<6>(problem, cameras, positions, rotations, principals, focals, distortions, keypointMap, traces);
+      break;
   }
 
   if (pass == 0) {
@@ -858,10 +830,13 @@ void refine(
     lockParameters(problem, focals);
     if (FLAGS_shared_distortion) {
       for (const auto& mapping : cameraGroupToIndex) {
-        lockParameter(problem, distortions[mapping.second]);
+//        lockParameter(problem, distortions[mapping.second]);
+          problem.SetParameterBlockConstant(distortions[mapping.second].data());
       }
     } else {
-      lockParameters(problem, distortions);
+//      lockParameters(problem, distortions);
+        for(auto& param:distortions)
+            problem.SetParameterBlockConstant(param.data());
     }
   } else {
     if (FLAGS_lock_positions) {
@@ -880,6 +855,7 @@ void refine(
       rotations[i],
       principals[i],
       focals[i],
+      distortionModel,
       distortions[FLAGS_shared_distortion ? group : i]);
   }
 

@@ -34,12 +34,17 @@ void Camera::setRotation(const Vector3& forward, const Vector3& up) {
   setRotation(forward, up, forward.cross(up));
 }
 
-Camera::Camera(const Type type, const Vector2& res, const Vector2& focal):
+Camera::Camera(const Type type, DistortionModel model, const Vector2& res, const Vector2& focal):
     type(type), resolution(res), focal(focal) {
   position.setZero();
   rotation.setIdentity();
   principal = resolution / 2;
-  distortion.setZero();
+
+  distortionModel=model;
+  size_t distortionCount=distortionModelCount(distortionModel);
+
+  distortion.resize(distortionCount);
+  setsDistortionZero(distortion);
   setDefaultFov();
 }
 
@@ -64,10 +69,16 @@ Camera::Camera(const json::Value &json) {
   else
     principal = resolution / 2;
   
+  distortionModel=deserializeDistortionModel(json["distortionModel"]);
   if (json.HasKey("distortion"))
-    distortion = deserializeVector<2>(json["distortion"]);
+    deserializeDistortion(json["distortion"], distortion);
   else
-    distortion.setZero();
+  {
+      size_t distortionCount=distortionModelCount(distortionModel);
+
+      distortion.resize(distortionCount);
+      setsDistortionZero(distortion);
+  }
 
   if (json.HasKey("fov"))
     setFov(json["fov"].ToDouble());
@@ -96,8 +107,9 @@ json::Value Camera::serialize() const {
     result["focal"]=serializeVector(focal);
     result["id"]=id;
   
-    if (!distortion.isZero())
-        result["distortion"] = serializeVector(distortion);
+    result["distortionModel"]=serializeDistortionModel(distortionModel);
+    if (!isDistortionZero(distortion))
+        result["distortion"] = serializeDistortion(distortion);
     if (!isDefaultFov()) 
         result["fov"] = getFov();
     if (!group.empty())
