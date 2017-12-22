@@ -32,6 +32,8 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <boost/filesystem.hpp>
+
 using namespace cv;
 using namespace std;
 using namespace surround360;
@@ -70,6 +72,21 @@ DEFINE_int32(cubemap_height,              1536,           "face height of output
 DEFINE_string(cubemap_format,             "video",        "either video or photo");
 
 const Camera::Vector3 kGlobalUp = Camera::Vector3::UnitZ();
+
+namespace fs=boost::filesystem;
+
+void removeDir(std::string path)
+{
+    fs::path path_to_remove(path);
+
+    if(!fs::exists(path_to_remove))
+        return;
+
+    for(fs::directory_iterator end_dir_it, it(path_to_remove); it!=end_dir_it; ++it)
+    {
+        fs::remove_all(it->path());
+    }
+}
 
 // measured in radians from forward
 float approximateFov(const Camera& camera, const bool vertical) {
@@ -725,6 +742,16 @@ void renderStereoPanorama() {
   const string debugDir =
     FLAGS_output_data_dir + "/debug/" + FLAGS_frame_number;
 
+  //setup directories
+  fs::path outputDataDir=FLAGS_output_data_dir;
+  fs::path outputDir=FLAGS_output_equirect_path;
+
+  if(!fs::exists(outputDataDir))
+      fs::create_directory(outputDataDir);
+  if(!fs::exists(outputDir))
+      fs::create_directory(outputDir);
+
+
   RigDescription rig(FLAGS_rig_json_file);
   if (FLAGS_eqr_width % rig.getSideCameraCount() != 0) {
     VLOG(1) << "Number of side cameras:" << rig.getSideCameraCount();
@@ -766,7 +793,8 @@ void renderStereoPanorama() {
   if (FLAGS_save_debug_images) {
     const string projectionsDir =
       FLAGS_output_data_dir + "/debug/" + FLAGS_frame_number + "/projections/";
-    system(string("rm -f " + projectionsDir + "/*").c_str());
+//    system(string("rm -f " + projectionsDir + "/*").c_str());
+    removeDir(projectionsDir);
   }
 
   const double startProjectSphericalTime = getCurrTimeSec();

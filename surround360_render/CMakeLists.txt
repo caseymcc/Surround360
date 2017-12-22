@@ -6,9 +6,8 @@ IF(USE_HUNTER)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/Hunter/HunterGate.cmake)
 
   HunterGate(
-      URL "https://github.com/ruslo/hunter/archive/v0.18.30.tar.gz"
-      SHA1 "6fc9258f984aed303eb960a95e36e19f2e7e83be"
-      LOCAL
+    URL "https://github.com/ruslo/hunter/archive/v0.19.173.tar.gz"
+    SHA1 "750fb1d621af971fad6f303356b13017ad9f5e15"
   )
 ENDIF()
 
@@ -31,7 +30,7 @@ IF(USE_HUNTER)
   FIND_PACKAGE(Ceres CONFIG REQUIRED)
 
   SET(GLOG_LIBS glog::glog)
-  SET(GFLAGS_LIBS gflags-static)
+  SET(GFLAGS_LIBS gflags)
   SET(BOOST_LIBS Boost::system Boost::filesystem)
   set(EIGEN_LIBS Eigen3::Eigen)
   SET(DOUBLE_CONVERSION_LIBS "")
@@ -154,7 +153,7 @@ TARGET_LINK_LIBRARIES(
         Boost::system
         Boost::filesystem
         glog::glog
-        gflags-static
+        gflags
         LibJSON
 )
 ENDIF()
@@ -191,7 +190,7 @@ IF (DEFINED HALIDE_DIR)
            LibVrCamera
            LibJSON
            ${GLOG_LIBS}
-           ${GFLAG_LIBS}
+           ${GFLAGS_LIBS}
            ${OpenCV_LIBS}
            Halide
            dl
@@ -208,7 +207,7 @@ IF (DEFINED HALIDE_DIR)
            LibVrCamera
            LibJSON
            ${GLOG_LIBS}
-           ${GFLAG_LIBS}
+           ${GFLAGS_LIBS}
            ${OpenCV_LIBS}
            Halide
            dl
@@ -223,7 +222,7 @@ if(USE_HUNTER) #dl and z not supported in hunter yet
         LibVrCamera
         LibJSON
         ${GLOG_LIBS}
-        ${GFLAG_LIBS}
+        ${GFLAGS_LIBS}
         ${OpenCV_LIBS}
   )
 else()
@@ -232,7 +231,7 @@ else()
         LibVrCamera
         LibJSON
         ${GLOG_LIBS}
-        ${GFLAG_LIBS}
+        ${GFLAGS_LIBS}
         dl
         z
         ${OpenCV_LIBS}
@@ -253,7 +252,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${OpenCV_LIBS}
   ${PLATFORM_SPECIFIC_LIBS}
 )
@@ -270,7 +269,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${BOOST_LIBS}
   ${OpenCV_LIBS}
 )
@@ -287,7 +286,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${BOOST_LIBS}
   ${OpenCV_LIBS}
   ${PLATFORM_SPECIFIC_LIBS}
@@ -304,7 +303,7 @@ TARGET_LINK_LIBRARIES(
   TestLogger
   LibVrCamera
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${OpenCV_LIBS}
 )
 
@@ -326,7 +325,7 @@ IF (DEFINED HALIDE_DIR)
       LibVrCamera
       LibJSON
       ${GLOG_LIBS}
-      ${GFLAG_LIBS}
+      ${GFLAGS_LIBS}
       ${OpenCV_LIBS}
       "${CMAKE_CURRENT_BINARY_DIR}/CameraIspGenFast8${CMAKE_STATIC_LIBRARY_SUFFIX}"
       "${CMAKE_CURRENT_BINARY_DIR}/CameraIspGen8${CMAKE_STATIC_LIBRARY_SUFFIX}"
@@ -345,7 +344,7 @@ IF (DEFINED HALIDE_DIR)
       LibVrCamera
       LibJSON
       ${GLOG_LIBS}
-      ${GFLAG_LIBS}
+      ${GFLAGS_LIBS}
       ${OpenCV_LIBS}
       "${CMAKE_CURRENT_BINARY_DIR}/CameraIspGenFast8${CMAKE_STATIC_LIBRARY_SUFFIX}"
       "${CMAKE_CURRENT_BINARY_DIR}/CameraIspGen8${CMAKE_STATIC_LIBRARY_SUFFIX}"
@@ -373,7 +372,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${OpenCV_LIBS}
   ${PLATFORM_SPECIFIC_LIBS}
 )
@@ -390,7 +389,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${OpenCV_LIBS}
   ${PLATFORM_SPECIFIC_LIBS}
 )
@@ -407,7 +406,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${OpenCV_LIBS}
   ${PLATFORM_SPECIFIC_LIBS}
 )
@@ -433,7 +432,7 @@ IF (DEFINED HALIDE_DIR)
       LibVrCamera
       LibJSON
       ${GLOG_LIBS}
-      ${GFLAG_LIBS}
+      ${GFLAGS_LIBS}
       ${OpenCV_LIBS}
       ${CERES_LIBRARIES}
       Halide
@@ -451,7 +450,7 @@ IF (DEFINED HALIDE_DIR)
     LibVrCamera
     LibJSON
     ${GLOG_LIBS}
-    ${GFLAG_LIBS}
+    ${GFLAGS_LIBS}
     ${OpenCV_LIBS}
     ${CERES_LIBRARIES}
     Halide
@@ -469,7 +468,7 @@ ELSE()
     LibVrCamera
     LibJSON
     ${GLOG_LIBS}
-    ${GFLAG_LIBS}
+    ${GFLAGS_LIBS}
     ${OpenCV_LIBS}
     ${CERES_LIBRARIES}
     ${PLATFORM_SPECIFIC_LIBS}
@@ -496,7 +495,7 @@ IF (DEFINED HALIDE_DIR)
       LibVrCamera
       LibJSON
       ${GLOG_LIBS}
-      ${GFLAG_LIBS}
+      ${GFLAGS_LIBS}
       ${OpenCV_LIBS}
       ${CERES_LIBRARIES}
       Halide
@@ -514,7 +513,7 @@ IF (DEFINED HALIDE_DIR)
       LibVrCamera
       LibJSON
       ${GLOG_LIBS}
-      ${GFLAG_LIBS}
+      ${GFLAGS_LIBS}
       ${OpenCV_LIBS}
       ${CERES_LIBRARIES}
       Halide
@@ -532,7 +531,7 @@ ELSE()
     LibVrCamera
     LibJSON
     ${GLOG_LIBS}
-    ${GFLAG_LIBS}
+    ${GFLAGS_LIBS}
     ${OpenCV_LIBS}
     ${CERES_LIBRARIES}
     ${PLATFORM_SPECIFIC_LIBS}
@@ -550,7 +549,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${OpenCV_LIBS}
   ${CERES_LIBRARIES}
   ${PLATFORM_SPECIFIC_LIBS}
@@ -567,7 +566,7 @@ TARGET_LINK_LIBRARIES(
   LibVrCamera
   LibJSON
   ${GLOG_LIBS}
-  ${GFLAG_LIBS}
+  ${GFLAGS_LIBS}
   ${EIGEN_LIBS}
   ${BOOST_LIBS}
   ${DOUBLE_CONVERSION_LIBS}

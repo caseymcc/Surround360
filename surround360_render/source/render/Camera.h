@@ -290,7 +290,7 @@ struct Camera {
     if (type == Type::FTHETA) {
         if(distortionModel == DistortionModel::OmniDir){
             Vector3 point=camera.normalized();
-            Vector2 xu=Vector2(point.x()/(point.z()+distortion[0]), point.y()/(point.z()+distortion[0]));
+            Vector2 xu=Vector2(point.x()/(-point.z()+distortion[0]), -point.y()/(-point.z()+distortion[0]));
             Real r=xu.norm();
             Real d=distort(r);
             
@@ -319,16 +319,30 @@ struct Camera {
     }
     Real norm = sqrt(squaredNorm);
     Real r = undistort(norm);
-    Real angle;
-    if (type == Type::FTHETA) {
-      angle = r;
-    } else {
-      CHECK(type == Type::RECTILINEAR) << "unexpected: " << int(type);
-      angle = atan(r);
-    }
     Vector3 unit;
-    unit.head<2>() = sin(angle) / norm * sensor;
-    unit.z() = -cos(angle);
+
+    if(distortionModel==DistortionModel::OmniDir)
+    {
+        unit.z()=-(distortion[0]*r/(r-1.0));
+        unit.x()=sensor.x()*(unit.z()+distortion[0]);
+        unit.y()=sensor.y()*(unit.z()+distortion[0]);
+    }
+    else
+    {
+        Real angle;
+        if(type==Type::FTHETA)
+        {
+            angle=r;
+        }
+        else
+        {
+            CHECK(type==Type::RECTILINEAR)<<"unexpected: "<<int(type);
+            angle=atan(r);
+        }
+        
+        unit.head<2>()=sin(angle)/norm * sensor;
+        unit.z()=-cos(angle);
+    }
 
     return unit;
   }
