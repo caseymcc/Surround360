@@ -6,8 +6,8 @@ IF(USE_HUNTER)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/Hunter/HunterGate.cmake)
 
   HunterGate(
-    URL "https://github.com/ruslo/hunter/archive/v0.19.173.tar.gz"
-    SHA1 "750fb1d621af971fad6f303356b13017ad9f5e15"
+    URL "https://github.com/ruslo/hunter/archive/v0.19.205.tar.gz"
+    SHA1 "9771566fa6d618202d8447122b3e7951505ed779"
   )
 ENDIF()
 

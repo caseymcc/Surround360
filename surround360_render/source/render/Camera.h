@@ -290,6 +290,8 @@ struct Camera {
     if (type == Type::FTHETA) {
         if(distortionModel == DistortionModel::OmniDir){
             Vector3 point=camera.normalized();
+
+            //surround360 expects Z into optical axis and Y up, omnidir is calculated with Z out from optical axis and Y down
             Vector2 xu=Vector2(point.x()/(-point.z()+distortion[0]), -point.y()/(-point.z()+distortion[0]));
             Real r=xu.norm();
             Real d=distort(r);
@@ -323,9 +325,13 @@ struct Camera {
 
     if(distortionModel==DistortionModel::OmniDir)
     {
-        unit.z()=-(distortion[0]*r/(r-1.0));
-        unit.x()=sensor.x()*(unit.z()+distortion[0]);
-        unit.y()=sensor.y()*(unit.z()+distortion[0]);
+        Real r2=r*r;
+        Real xi=distortion[0];
+        Real z=(sqrt(r2-xi*xi*r2+1)-xi*r2)/(r2+1);
+        
+        unit.x()=sensor.x()*(z+xi)/norm;
+        unit.y()=-sensor.y()*(z+xi)/norm;
+        unit.z()=-z;
     }
     else
     {
